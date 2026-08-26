@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta charset="utf-8"><title>studio self-test</title>
+<style>body{margin:0;font:700 42px/1.4 system-ui;padding:40px;background:#fff}
+#result{padding:30px;border-radius:16px;color:#fff;background:#b00} #result.ok{background:#12813f}
+#host{position:absolute;left:-9999px;top:0}</style></head><body>
+<div id="result">RUNNING…</div>
+<div id="host"></div>
+<script src="lib/html-to-image.js"></script>
+<script type="module">
+/* Renders one post of a brand and captures it to PNG. Green = the brand module,
+   its assets and the export pipeline all work. Open as: test.html?v=<brand> */
+const out = document.getElementById('result');
+try {
+  const { BRANDS } = await import('../brands/registry.mjs');
+  const v = new URLSearchParams(location.search).get('v') || BRANDS[0];
+  const { CONFIG } = await import(`../brands/${v}/studio.mjs`);
+  const a = CONFIG.assets[2] || CONFIG.assets[0];
+  const s = a.slides[0];
+  const { w, h } = CONFIG.FMT[s.fmt];
+  const st = document.createElement('style');
+  st.textContent = CONFIG.css(s.fmt, CONFIG.base).replaceAll('.card', '#host .card');
+  document.head.appendChild(st);
+  const host = document.getElementById('host');
+  host.innerHTML = CONFIG.renderSlide(s, CONFIG.base);
+  await document.fonts.ready;
+  await new Promise(r => setTimeout(r, 800));
+  const png = await htmlToImage.toPng(host.querySelector('.card'), { width: w, height: h, pixelRatio: 2 });
+  const img = new Image(); img.src = png; await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+  out.textContent = `PNG OK · ${v} · #${a.id} · ${img.width}×${img.height}`;
+  out.className = 'ok';
+} catch (e) { out.textContent = 'FAIL: ' + e; }
+</script></body></html>

@@ -1,0 +1,463 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LinkedIn Post Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Stack+Sans+Headline:wght@400..700&family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box }
+  body { background:#0e0f10; color:#e9ebee; font-family:Inter,system-ui,sans-serif;
+         -webkit-font-smoothing:antialiased; padding:0 40px 140px }   /* bottom reserve: the dock */
+
+  /* ---------- sticky command bar: always reachable, blurred gradient behind ---------- */
+  .g-top { position:fixed; top:0; left:0; right:0; z-index:40; padding:18px 40px;
+           display:flex; align-items:center; justify-content:space-between; gap:20px }
+  .g-spacer { height:80px }   /* reserves the fixed bar height (runtime code refines it) */
+  /* GRADUAL blur: a stack of layers, each blurring more and masked to end sooner, so the
+     blur ramps smoothly from strong at the top to none at the bottom edge. No colour band. */
+  .blurstack { position:absolute; inset:0 0 -34px; z-index:-1; pointer-events:none }
+  .blurstack i { position:absolute; inset:0; display:block }
+  .blurstack i:nth-child(1) { backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px);
+     -webkit-mask-image:linear-gradient(180deg,#000 0%,#000 62%,transparent 100%);
+             mask-image:linear-gradient(180deg,#000 0%,#000 62%,transparent 100%) }
+  .blurstack i:nth-child(2) { backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+     -webkit-mask-image:linear-gradient(180deg,#000 0%,#000 40%,transparent 76%);
+             mask-image:linear-gradient(180deg,#000 0%,#000 40%,transparent 76%) }
+  .blurstack i:nth-child(3) { backdrop-filter:blur(11px); -webkit-backdrop-filter:blur(11px);
+     -webkit-mask-image:linear-gradient(180deg,#000 0%,#000 24%,transparent 54%);
+             mask-image:linear-gradient(180deg,#000 0%,#000 24%,transparent 54%) }
+  .blurstack i:nth-child(4) { backdrop-filter:blur(22px) saturate(130%); -webkit-backdrop-filter:blur(22px) saturate(130%);
+     -webkit-mask-image:linear-gradient(180deg,#000 0%,#000 10%,transparent 34%);
+             mask-image:linear-gradient(180deg,#000 0%,#000 10%,transparent 34%) }
+  /* the faintest veil, only so white type stays readable over bright cards */
+  .blurstack i:nth-child(5) { background:linear-gradient(180deg,rgba(14,15,16,.62),rgba(14,15,16,0) 78%) }
+  .tb-left { display:flex; align-items:center; gap:14px; min-width:0 }
+  /* the brand + count fade in beside the logo once the big title scrolls away */
+  .tb-left .compact { display:flex; align-items:baseline; gap:9px; opacity:0; transform:translateY(3px);
+           transition:opacity .22s, transform .22s; white-space:nowrap; pointer-events:none }
+  .g-top.stuck .tb-left .compact { opacity:1; transform:none }
+  .tb-left .compact b { font-size:14.5px; font-weight:650; color:#fff; letter-spacing:-.01em }
+  .tb-left .compact span { font-size:12px; color:rgba(255,255,255,.52); font-weight:500 }
+  .tb-left img { height:15px }
+  .tb-left .lbl { font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.46) }
+  .g-help { position:relative; width:30px; height:30px; border:1px solid rgba(255,255,255,.16); border-radius:50%;
+            display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.68);
+            font-size:15px; font-weight:600; cursor:default; transition:color .15s, border-color .15s }
+  .g-help:hover { color:#fff; border-color:rgba(255,255,255,.42) }
+  .g-help .tip { display:none; position:absolute; right:0; top:40px; width:440px; background:#17181a;
+                 border:1px solid #26282b; border-radius:12px; padding:16px 18px; font-size:13.5px; font-weight:400;
+                 line-height:1.6; color:#c7cace; z-index:50; box-shadow:0 20px 60px rgba(0,0,0,.5); text-align:left }
+  .g-help .tip b { color:#fff }
+  .g-help:hover .tip { display:block }
+
+  /* ---------- page header: title + favourites filter ---------- */
+  .g-head { margin:26px 0 34px }
+  .g-head h1 { font-size:32px; font-weight:650; letter-spacing:-.025em; color:#fff }
+  .g-head .g-sub { color:#6b7075; font-size:13px; margin-top:7px; font-weight:500 }
+  /* favourites: a heart next to a real toggle, red when on */
+  .favfilter { display:inline-flex; align-items:center; gap:10px; background:none; border:none;
+               padding:6px 4px; cursor:pointer; font-family:inherit; flex:none }
+  .favfilter .hrt { font-size:15px; line-height:1; color:rgba(255,255,255,.5); transition:color .16s }
+  .favfilter:hover .hrt { color:rgba(255,255,255,.8) }
+  .favfilter .sw { width:34px; height:20px; border-radius:20px; background:rgba(255,255,255,.16); position:relative;
+                   flex:none; transition:background .18s }
+  .favfilter .sw::after { content:''; position:absolute; top:3px; left:3px; width:14px; height:14px;
+                   border-radius:50%; background:rgba(255,255,255,.8); transition:left .18s, background .18s }
+  .favfilter:hover .sw { background:rgba(255,255,255,.26) }
+  .favfilter.on .hrt { color:#ff4d5a }
+  .favfilter.on .sw { background:#ff4d5a }
+  .favfilter.on .sw::after { left:17px; background:#fff }
+  .g-empty { color:#6b7075; font-size:14px; padding:40px 0 }
+  .h-acts { display:flex; align-items:center; gap:16px; flex:none }
+  .g-top .h-acts { margin-left:auto }
+  .newtop { display:inline-flex; align-items:center; gap:7px; background:rgba(255,255,255,.07);
+            border:1px solid rgba(255,255,255,.16); color:#e9ebee; border-radius:100px;
+            padding:8px 15px 8px 13px; font-size:12.5px; font-weight:600; cursor:pointer;
+            font-family:inherit; transition:background .16s, border-color .16s, color .16s }
+  .newtop:hover { background:#fff; border-color:#fff; color:#0e0f10 }
+  .newtop .p2 { font-size:14px; line-height:1; font-weight:400 }
+
+  /* ---------- masonry gallery (Pinterest style, fills the page) ---------- */
+  #grid { columns:300px; column-gap:22px }
+  .g-card { cursor:pointer; break-inside:avoid; margin-bottom:22px; position:relative }
+  .shot { position:relative; border-radius:12px; overflow:hidden; background:#141516;
+          border:1px solid #26282b; transition:border-color .18s }
+  .g-card:hover .shot { border-color:#3a3d40 }
+  .pv { position:relative; width:100%; overflow:hidden }
+  .pv > * { transform-origin:top left; position:absolute; left:0; top:0 }
+  .shot video { display:block; width:100%; height:auto }
+  .badge { position:absolute; right:10px; bottom:10px; background:rgba(10,11,10,.82); backdrop-filter:blur(6px);
+           font-size:11px; letter-spacing:.08em; color:rgba(255,255,255,.88); padding:5px 10px; border-radius:100px;
+           border:1px solid rgba(255,255,255,.16); z-index:3 }
+  .num { position:absolute; left:10px; bottom:10px; z-index:4; background:rgba(10,11,10,.88); color:#fff;
+         font-size:12px; font-weight:700; padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.14);
+         opacity:0; transition:opacity .16s }
+  .fav { position:absolute; top:10px; right:10px; z-index:5; background:none; border:none; cursor:pointer;
+         font-size:17px; line-height:1; color:#fff; opacity:0; transition:opacity .16s, color .16s;
+         text-shadow:0 1px 8px rgba(0,0,0,.55); padding:4px; font-family:inherit }
+  .g-card:hover .fav { opacity:.75 }
+  .fav:hover { opacity:1 !important }
+  .g-card.faved .fav { opacity:1; color:#ff4d5a }
+  .act { position:absolute; top:10px; left:10px; display:flex; gap:7px; opacity:0; transition:opacity .16s; z-index:4 }
+  .g-card:hover .act, .g-card:hover .num { opacity:1 }
+  .act button, .act a { display:inline-flex; align-items:center; gap:6px; background:rgba(10,11,10,.9); color:#fff;
+       font-size:12.5px; font-weight:600; padding:8px 10px; border-radius:8px; text-decoration:none;
+       border:none; cursor:pointer; font-family:inherit; opacity:.62; transition:opacity .14s }
+  .act button:hover, .act a:hover { opacity:1 }
+
+  /* ---------- new post card ---------- */
+  .g-new { break-inside:avoid; margin-bottom:22px; border:1px dashed #2f3236; border-radius:12px;
+           background:none; color:#6b7075; cursor:pointer; width:100%; font-family:inherit;
+           aspect-ratio:4/5; display:flex; flex-direction:column; align-items:center;
+           justify-content:center; gap:12px; transition:border-color .18s, color .18s }
+  .g-new:hover { border-color:#4a4e52; color:#c7cace }
+  .g-new .plus { font-size:30px; font-weight:300; line-height:1 }
+  .g-new .lb2 { font-size:12.5px; font-weight:600; letter-spacing:.02em }
+
+
+  /* ---------- lightbox (videos) ---------- */
+  dialog { border:none; background:rgba(10,11,12,.98); width:100vw; height:100vh; max-width:none; max-height:none; padding:0; color:#e9ebee }
+  dialog::backdrop { background:transparent }
+  dialog .x { position:fixed; top:18px; right:24px; width:44px; height:44px; border-radius:50%;
+              border:1px solid rgba(255,255,255,.22); background:rgba(20,22,26,.92); color:#fff;
+              font-size:22px; cursor:pointer; z-index:9 }
+  dialog .x:hover { background:#000 }
+  #lbc { width:100%; height:100%; display:flex; align-items:center; justify-content:center; padding:4vh 4vw }
+  #lbc video { max-width:92vw; max-height:88vh; border-radius:10px }
+
+  /* ---------- editor ---------- */
+  #ed .wrap { display:grid; grid-template-columns:1fr 300px; width:100%; height:100% }
+  #ed #main { position:relative }
+  .tipcard { position:absolute; right:20px; bottom:76px; z-index:6; width:290px; text-align:left;
+      background:#17181a; border:1px solid #2e3134; border-radius:14px; padding:15px 16px 14px;
+      box-shadow:0 24px 60px rgba(0,0,0,.55) }
+  /* Scoped to the card's own heading. Unscoped, the <b> inside the paragraph
+     below inherited this too — so "your own Claude" broke onto its own line
+     mid-sentence at 13.5px white bold against 12px grey body copy, reading as a
+     second heading rather than as three words of a sentence. */
+  .tipcard > b { display:block; font-size:13.5px; font-weight:650; color:#fff; margin-bottom:6px }
+  .tipcard p { font-size:12px; line-height:1.55; color:#9aa0a6; margin-bottom:11px }
+  /* Inline emphasis stays in the paragraph's own type — same family, size,
+     weight and colour. The element is kept for meaning, not for a type change. */
+  .tipcard p b { display:inline; font:inherit; color:inherit }
+  .tipcard .ts { display:flex; gap:9px; align-items:flex-start; font-size:11.5px; line-height:1.5;
+      color:#c7cace; margin-top:7px }
+  .tipcard .ts span:first-child { flex:none; width:17px; height:17px; border-radius:50%; background:#26282b;
+      color:#9aa0a6; font-size:9.5px; font-weight:700; display:flex; align-items:center; justify-content:center }
+  .tipcard code { display:inline-block; margin-top:4px; background:#0e0f10; border:1px solid #26282b;
+      border-radius:5px; padding:3px 6px; font-size:10.5px; color:#c7cace; cursor:pointer;
+      word-break:break-all; transition:border-color .15s, color .15s }
+  .tipcard code:hover { border-color:#4a4e52; color:#fff }
+  .tipcard .tx { position:absolute; top:8px; right:9px; background:none; border:none; color:#6b7075;
+      font-size:16px; line-height:1; cursor:pointer; padding:2px 4px }
+  .tipcard .tx:hover { color:#fff }
+  #ed .wrap.has-rail { grid-template-columns:172px 1fr 300px }
+  #rail { border-right:1px solid #26282b; padding:14px 12px; overflow-y:auto; display:none;
+          flex-direction:column; gap:10px }
+  .has-rail #rail { display:flex }
+  #rail .rl-h { font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:#6b7075; margin:2px 2px 2px }
+  #rail .s { position:relative; border:1.5px solid #2a2c2f; border-radius:9px; overflow:hidden; cursor:grab;
+             background:#141516; padding:0; width:100%; flex:none }
+  #rail .s.sel { border-color:rgba(255,255,255,.85) }
+  #rail .s .rpv { position:relative; width:100%; overflow:hidden; pointer-events:none }
+  #rail .s .rpv > * { transform-origin:top left; position:absolute; left:0; top:0 }
+  #rail .s .n { position:absolute; left:6px; top:6px; z-index:2; background:rgba(10,11,10,.85); color:#fff;
+                font-size:10.5px; font-weight:700; padding:3px 7px; border-radius:6px }
+  #rail .s.dragover { border-color:rgba(255,255,255,.85); border-style:dashed }
+  #rail .ops { display:flex; gap:6px; margin-top:2px }
+  #rail .ops button { flex:1; font-size:12px; padding:7px 0; background:#1a1c1f; border:1px solid #2a2c2f;
+             color:#c7cace; border-radius:7px; cursor:pointer; font-family:inherit }
+  #rail .ops button:hover { border-color:#3a3d40; color:#fff }
+  #main { display:flex; flex-direction:column; padding:14px 20px 18px; gap:12px; min-width:0 }
+  #stagebox { flex:1; position:relative; min-height:0 }
+  #stage { position:absolute; left:50%; top:50%; transform-origin:center center;
+           border-radius:18px; overflow:hidden;
+           box-shadow:0 0 0 1px rgba(255,255,255,.22), 0 40px 110px rgba(0,0,0,.55) }
+  #stage [contenteditable] { outline:none }
+  #stage [contenteditable]:hover { box-shadow:0 0 0 1.5px rgba(255,255,255,.55) }
+  /* the hovered block gets a faint outline; its ✕ floats at the top-right */
+  #stage .blk-hi { box-shadow:0 0 0 1.5px rgba(255,255,255,.5) !important; border-radius:4px }
+  #rmbtn { position:absolute; z-index:60; width:22px; height:22px; border-radius:50%; border:1px solid rgba(255,255,255,.28);
+           background:#0e0f10; color:#fff; font-size:13px; line-height:1; cursor:pointer; display:none;
+           align-items:center; justify-content:center; padding:0 0 1px; font-family:inherit }
+  #rmbtn:hover { background:#000; border-color:#fff }
+  #rmbtn.show { display:flex }
+  .edrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; flex:none }
+  .edrow button, .edrow select { background:#1a1c1f; color:#fff; border:1px solid #2a2c2f;
+      border-radius:100px; padding:9px 17px; font-size:13px; cursor:pointer; font-family:inherit }
+  .edrow button:hover { border-color:#3a3d40 }
+  .edrow .dl { background:#fff; color:#0e0f10; font-weight:700; border:none }
+  .edrow .dl:hover { background:#d9dcdf }
+
+  /* right sidebar: background + layer controls */
+  #side { border-left:1px solid #26282b; padding:74px 14px 16px; overflow-y:auto; display:flex; flex-direction:column; gap:8px }
+  #side .sd-h { font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:#6b7075; margin:8px 2px 2px }
+  #side .toggles { display:flex; flex-direction:column; gap:7px }
+  #side .toggles button { display:flex; align-items:center; justify-content:space-between; width:100%;
+      background:#1a1c1f; border:1px solid #2a2c2f; color:#c7cace; border-radius:9px; padding:9px 12px;
+      font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit }
+  #side .toggles button:hover { border-color:#3a3d40; color:#fff }
+  #side .toggles .sw { width:32px; height:19px; border-radius:20px; background:#2a2c2f; position:relative;
+      flex:none; transition:background .16s }
+  #side .toggles .sw::after { content:''; position:absolute; top:2.5px; left:3px; width:14px; height:14px;
+      border-radius:50%; background:#9aa0a6; transition:left .16s, background .16s }
+  #side .toggles button.on .sw { background:#fff }
+  #side .toggles button.on .sw::after { left:15px; background:#0e0f10 }
+  #side .swatches { display:grid; grid-template-columns:repeat(3, 1fr); gap:7px }
+  #side .swatches button { aspect-ratio:1; border-radius:8px; border:2px solid #2a2c2f; cursor:pointer;
+      background-size:cover; background-position:center; font-size:9.5px; color:#fff; font-family:inherit }
+  #side .swatches button:hover { border-color:rgba(255,255,255,.85) }
+  /* the illustration picker: fixed squares, each previewing itself, name on hover */
+  #side .wlist { display:grid; grid-template-columns:1fr 1fr; gap:8px }
+  #side .wcard { position:relative; padding:0; background:#fff; border:1.5px solid #2a2c2f;
+      border-radius:10px; cursor:pointer; font-family:inherit; overflow:hidden;
+      aspect-ratio:1; width:100%; transition:border-color .15s }
+  #side .wcard:hover { border-color:rgba(255,255,255,.7) }
+  #side .wcard.on { border-color:rgba(255,255,255,.9); box-shadow:0 0 0 2px rgba(255,255,255,.18) }
+  #side .wcard .wpv { position:absolute; inset:0; overflow:hidden; display:block }
+  #side .wcard .wpv > * { position:absolute; left:0; top:0; transform-origin:top left }
+  /* black infobox, only while hovering */
+  #side .wcard .wlb { position:absolute; left:5px; right:5px; bottom:5px; z-index:2;
+      background:rgba(8,9,10,.9); color:#fff; border-radius:6px; padding:5px 7px;
+      font-size:10.5px; font-weight:600; line-height:1.25; text-align:left;
+      opacity:0; transform:translateY(3px); transition:opacity .14s, transform .14s; pointer-events:none }
+  #side .wcard:hover .wlb { opacity:1; transform:none }
+  #side .wclear { grid-column:1 / -1; background:#1a1c1f; border:1px solid #2a2c2f; color:#9aa0a6; border-radius:9px;
+      padding:8px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit }
+  #side .wclear:hover { color:#fff; border-color:#3a3d40 }
+  #side .reset { margin-top:14px; width:100%; background:none; border:1px solid #2a2c2f; color:#6b7075;
+      border-radius:9px; padding:9px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit }
+  #side .reset:hover { color:#fff; border-color:#3a3d40 }
+  /* empty illustration section: the slot exists, Claude fills it */
+  #side .wempty { border:1px dashed #2f3236; border-radius:10px; padding:12px 13px;
+      font-size:12px; line-height:1.55; color:#9aa0a6 }
+  #side .wempty b { color:#c7cace }
+
+  /* ---------- the dock: clone from GitHub + more free tools, floating at the bottom ---------- */
+  .dock { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:30;
+          max-width:calc(100vw - 24px) }
+  /* never wrap: a wrapped pill keeps its 100px radius and reads as a blob, and the
+     separator strands itself on a line of its own. Narrow screens drop the least
+     useful element instead (see the media queries at the end of this sheet). */
+  .dock-bar { display:flex; align-items:center; gap:16px; flex-wrap:nowrap; justify-content:center;
+          background:rgba(23,24,26,.92); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+          border:1px solid #2e3134; border-radius:100px; padding:9px 10px 9px 20px;
+          box-shadow:0 18px 50px rgba(0,0,0,.55) }
+  .dock-brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none;
+          color:#c7cace; font-size:12.5px; font-weight:600; transition:color .15s; white-space:nowrap }
+  .dock-brand:hover { color:#fff }
+  .dock-brand img { height:12px; display:block }
+  .dock-brand .tag-short { display:none }
+  .dock-sep { width:1px; height:22px; background:#2e3134; flex:none }
+  .dock-gh { display:inline-flex; align-items:center; gap:9px; background:#fff; color:#0e0f10;
+          border-radius:100px; padding:11px 21px; font-size:13.5px; font-weight:700;
+          text-decoration:none; white-space:nowrap; transition:transform .15s }
+  .dock-gh:hover { transform:translateY(-1px) }
+  .dock-gh svg { display:block }
+  .dock-gh .gh-short { display:none }
+  .dock-how { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px;
+          border-radius:50%; border:1px solid rgba(255,255,255,.16); background:none; color:rgba(255,255,255,.68);
+          font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; flex:none;
+          transition:color .15s, border-color .15s }
+  .dock-how:hover, .dock-how.on { color:#fff; border-color:rgba(255,255,255,.42) }
+  .dock-info { position:absolute; bottom:66px; right:0; width:min(430px, calc(100vw - 32px));
+          background:#17181a; border:1px solid #2e3134; border-radius:14px; padding:18px 20px 16px;
+          box-shadow:0 24px 60px rgba(0,0,0,.55); text-align:left;
+          max-height:calc(100vh - 100px); overflow-y:auto }
+  .dock-info h3 { font-size:13.5px; font-weight:650; color:#fff; margin-bottom:6px }
+  .dock-info p { font-size:12.5px; line-height:1.6; color:#9aa0a6; margin-bottom:12px }
+  .dock-info p b { color:#c7cace; font-weight:600 }
+  .dock-info .st { display:flex; gap:10px; align-items:flex-start; font-size:12.5px; line-height:1.55;
+          color:#c7cace; margin-bottom:10px }
+  .dock-info .st span:first-child { flex:none; width:18px; height:18px; border-radius:50%; background:#26282b;
+          color:#9aa0a6; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center;
+          margin-top:1px }
+  .dock-info .st i { font-style:normal; color:#9aa0a6 }
+  .dock-info code { background:#0e0f10; border:1px solid #26282b; border-radius:5px; padding:1px 5px;
+          font-size:11px; color:#c7cace }
+  .dock-info .dx { position:absolute; top:9px; right:10px; background:none; border:none; color:#6b7075;
+          font-size:16px; line-height:1; cursor:pointer; padding:2px 4px }
+  .dock-info .dx:hover { color:#fff }
+
+  /* ---------- small screens ----------
+     The studio's editor is a desktop layout, but the gallery and the dock have to
+     survive a phone. Each step down drops the least useful element rather than
+     letting anything wrap or overflow. */
+  @media (max-width: 780px) {
+    body { padding:0 22px 132px }
+    .g-top { padding:16px 22px }
+    .g-help .tip { width:min(440px, calc(100vw - 32px)) }
+    .dock-bar { gap:13px; padding:9px 10px 9px 16px }
+    /* the invitation stays, in fewer words */
+    .dock-brand .tag-long { display:none }
+    .dock-brand .tag-short { display:inline }
+  }
+  @media (max-width: 600px) {
+    .dock-brand .tag-short { display:none }  /* the logo alone keeps the link */
+  }
+  @media (max-width: 620px) {
+    .g-head { margin:20px 0 26px }
+    .g-head h1 { font-size:26px }
+    .tb-left .lbl { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+    .tb-left .compact { display:none }       /* the big title is right there */
+    .h-acts { gap:12px }
+  }
+  @media (max-width: 500px) {
+    body { padding:0 16px 126px }
+    .g-top { padding:14px 16px; gap:12px }
+    #grid { columns:auto; column-gap:0 }     /* one honest column, full width */
+    /* a full-width pill reads as a blob, so square it off into a bottom bar */
+    .dock { left:10px; right:10px; transform:none; max-width:none }
+    .dock-bar { justify-content:space-between; border-radius:18px; gap:10px; padding:9px 10px }
+    .dock-sep { display:none }
+    .dock-gh { padding:11px 15px; font-size:13px }
+    .dock-gh .gh-long { display:none }
+    .dock-gh .gh-short { display:inline }
+    .dock-info { left:0; right:0; width:auto }
+  }
+  @media (max-width: 380px) {
+    .dock-bar { gap:8px; padding:8px 9px }
+    .dock-brand img { height:10px }
+    .dock-gh { padding:10px 13px; font-size:12.5px; gap:7px }
+    .dock-how { width:30px; height:30px; font-size:14px }
+  }
+</style></head>
+<body>
+  <div class="g-top" id="gtop">
+    <div class="tb-left">
+      <img src="img/builders-logo.svg" alt="Builders"><span class="lbl">LinkedIn Post Generator</span>
+      <span class="compact" id="compact"><b id="ctitle"></b><span id="ccount"></span></span>
+    </div>
+    <div class="h-acts">
+      <button class="favfilter" id="favfilter" title="Show favourites only"><span class="hrt">♥</span><span class="sw"></span></button>
+      <button class="newtop" id="newtop"><span class="p2">+</span> New post</button>
+    </div>
+    <div class="blurstack" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="g-help">?<div class="tip">
+      <b>Click any post</b> to open the editor: click text to rewrite it, set the background and
+      layers from the right panel, drag slides to reorder a carousel, switch the post size, then
+      export <b>PNG</b>, <b>PDF</b> (carousel) or a subtle <b>6-second video</b>. Esc closes.<br><br>
+      Hover any block (a line of copy, a product illustration, the logo) and click its
+      <b>✕</b> to remove it. <b>Reset to original</b> in the right panel restores the post
+      exactly as it was designed.<br><br>
+      On the grid, hover a card for its <b>number</b>, <b>↓ PNG</b>, <b>♥ favourite</b>,
+      <b>⧉ duplicate</b> and <b>✕ remove</b> — favourites and edits are saved automatically
+      in this browser.</div></div>
+  </div>
+
+  <div class="g-spacer" id="gspacer"></div>
+  <span id="gsentinel" style="display:block;height:1px;margin-top:-1px"></span>
+
+  <div class="g-head">
+    <h1 id="htitle"></h1>
+    <div class="g-sub" id="hsub"></div>
+  </div>
+
+  <div id="grid"></div>
+
+  <script>
+    /* the bar gains its hairline + compact title once the page scrolls */
+    (function () {
+      var bar = document.getElementById('gtop'), sp = document.getElementById('gspacer');
+      /* never let content slip under the fixed bar: keep the spacer at least as tall
+         as the bar, re-measuring as the logo/fonts land or the bar wraps */
+      function size() { sp.style.height = Math.max(80, bar.offsetHeight) + 'px'; }
+      size();
+      addEventListener('resize', size);
+      addEventListener('load', size);
+      new ResizeObserver(size).observe(bar);
+      if (document.fonts) document.fonts.ready.then(size);
+      setTimeout(size, 400); setTimeout(size, 1200);
+
+      /* The bar earns its hairline + compact title once the page title has scrolled
+         under it. An IntersectionObserver on a sentinel is more reliable than scroll
+         events (and keeps working in embedded/automated browsers). */
+      var sentinel = document.getElementById('gsentinel');
+      function setStuck(on) { bar.classList.toggle('stuck', on); }
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (es) { setStuck(!es[0].isIntersecting); },
+          { rootMargin: '0px 0px 0px 0px', threshold: 0 }).observe(sentinel);
+      }
+      addEventListener('scroll', function () {
+        setStuck((window.scrollY || document.documentElement.scrollTop) > 20);
+      }, { passive: true });
+    })();
+  </script>
+
+
+  <dialog id="lb"><button class="x" onclick="lb.close()">✕</button><div id="lbc"></div></dialog>
+  <dialog id="ed"><button class="x" onclick="ed.close()">✕</button>
+    <div class="wrap" id="edwrap">
+      <div id="rail"></div>
+      <div id="main">
+        <div id="stagebox"><div id="stage"></div><button id="rmbtn" title="Remove this block">✕</button></div>
+        <div class="tipcard" id="tipcard" hidden>
+          <button class="tx" id="tipx" title="Dismiss">&times;</button>
+          <b>Need a custom design?</b>
+          <p>This is the brand template. For a new layout, a new illustration or a whole
+             concept, ask <b>Claude</b> (or any AI coding assistant) — it can add finished
+             posts straight to this page by editing your brand file.</p>
+          <div class="ts"><span>1</span><span>Open this tool's folder in Claude Code, or give Claude this guide:<br><code id="tipurl" title="Click to copy">…</code></span></div>
+          <div class="ts"><span>2</span><span>Describe the post. Reload this page and it appears in the grid.</span></div>
+        </div>
+        <div class="edrow">
+          <select id="fmtsel" title="Post size"></select>
+          <button class="dl" id="pngbtn">↓ PNG</button>
+          <button class="dl" id="pdfbtn">↓ PDF</button>
+          <button class="dl" id="vidbtn">↓ Video</button>
+        </div>
+      </div>
+      <div id="side"></div>
+    </div>
+  </dialog>
+
+  <!-- the dock: this tool is free to own — clone it, and there are more where it came from -->
+  <div class="dock">
+    <div class="dock-info" id="dockinfo" hidden>
+      <button class="dx" id="dockx" title="Close">&times;</button>
+      <h3>This studio is a free tool you can own</h3>
+      <p>It is a plain folder of web pages: no accounts, no server, no install.
+         Everything runs in your browser and your edits stay on your computer.</p>
+      <div class="st"><span>1</span><span><b>Get your own copy.</b> On the GitHub page, click the green
+         <b>Code</b> button, then <b>Download ZIP</b> (or fork it if you use GitHub). Unzip anywhere,
+         then double-click <code>start-mac.command</code> on a Mac or <code>start-windows.bat</code>
+         on Windows. <i>Full details in the README.</i></span></div>
+      <div class="st"><span>2</span><span><b>Connect it to Claude Code.</b> Open the folder in
+         <a href="https://claude.com/claude-code" target="_blank" rel="noopener" style="color:#c7cace">Claude Code</a>
+         and just ask: "set this up for my brand, here is our website". The included AGENTS.md teaches
+         Claude how the tool works, so it can build your brand, write posts, and generate product
+         illustrations for you.</span></div>
+      <div class="st"><span>3</span><span><b>Change the tool itself, any time.</b> Nothing here is
+         fixed: it is all plain code that Claude knows how to edit. Ask for a new layout, a new
+         export format, a whole new feature, and the tool reshapes itself around you.</span></div>
+    </div>
+    <div class="dock-bar">
+      <a class="dock-brand" href="https://toolkit.builders.studio" target="_blank" rel="noopener" title="More free tools by Builders Studio">
+        <img src="img/builders-logo.svg" alt="Builders">
+        <span class="tag-long">Check out other free tools →</span>
+        <span class="tag-short">Free tools →</span>
+      </a>
+      <span class="dock-sep"></span>
+      <a class="dock-gh" href="https://github.com/buildersstudio/linkedin-post-studio" target="_blank" rel="noopener">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        <span class="gh-long">Clone this tool from GitHub</span>
+        <span class="gh-short">Clone from GitHub</span>
+      </a>
+      <button class="dock-how" id="dockhow" title="How this works">?</button>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var b = document.getElementById('dockhow'), p = document.getElementById('dockinfo');
+      function set(open) { p.hidden = !open; b.classList.toggle('on', open); }
+      b.onclick = function (e) { e.stopPropagation(); set(p.hidden); };
+      document.getElementById('dockx').onclick = function () { set(false); };
+      document.addEventListener('click', function (e) {
+        if (!p.hidden && !p.contains(e.target) && e.target !== b) set(false);
+      });
+    })();
+  </script>
+
+<script src="lib/html-to-image.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<script type="module" src="studio.mjs"></script>
+</body></html>

@@ -1,0 +1,102 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LinkedIn Post Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box }
+  body { background:#0e0f10; color:#e9ebee; font-family:Inter,system-ui,sans-serif;
+         -webkit-font-smoothing:antialiased; padding:0 24px 90px }
+  .wrap { max-width:880px; margin:0 auto }
+  header { display:flex; align-items:center; gap:12px; padding:26px 0 0 }
+  header svg { flex:none }
+  header .lbl { font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.46) }
+  .hero { padding:72px 0 44px }
+  .hero h1 { font-size:44px; font-weight:650; letter-spacing:-.03em; color:#fff; line-height:1.06; max-width:640px }
+  .hero h1 em { font-style:normal; color:#7b93ff }
+  .hero p { margin-top:18px; font-size:16.5px; line-height:1.6; color:#9aa0a6; max-width:600px }
+  .hero .cta { display:inline-flex; align-items:center; gap:9px; margin-top:28px; background:#fff; color:#0e0f10;
+        border-radius:100px; padding:13px 24px; font-size:14.5px; font-weight:650; text-decoration:none;
+        transition:transform .15s }
+  .hero .cta:hover { transform:translateY(-1px) }
+  .hero .cta span { font-weight:400 }
+
+  .sect { font-size:11px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:#6b7075; margin:44px 0 16px }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:16px }
+  .bcard { display:block; background:#141516; border:1px solid #26282b; border-radius:14px; padding:22px;
+           text-decoration:none; color:inherit; transition:border-color .18s }
+  .bcard:hover { border-color:#3a3d40 }
+  .bcard .swp { display:flex; gap:6px; margin-bottom:16px }
+  .bcard .swp i { width:22px; height:22px; border-radius:6px; display:block }
+  .bcard b { display:block; font-size:16px; font-weight:650; color:#fff; letter-spacing:-.01em }
+  .bcard span { display:block; margin-top:5px; font-size:13px; color:#9aa0a6; line-height:1.5 }
+  .bcard.add { border-style:dashed; border-color:#2f3236; background:none }
+  .bcard.add:hover { border-color:#4a4e52 }
+  .bcard.add b { color:#c7cace }
+
+  .steps { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:16px }
+  .step { background:#141516; border:1px solid #26282b; border-radius:14px; padding:20px 22px }
+  .step .n { display:inline-flex; width:24px; height:24px; border-radius:50%; background:#26282b; color:#c7cace;
+             font-size:12px; font-weight:700; align-items:center; justify-content:center; margin-bottom:12px }
+  .step b { display:block; font-size:14.5px; font-weight:650; color:#fff }
+  .step p { margin-top:6px; font-size:13px; line-height:1.55; color:#9aa0a6 }
+  .step code { font-family:'JetBrains Mono',monospace; font-size:11.5px; background:#0e0f10; border:1px solid #26282b;
+               border-radius:5px; padding:2px 6px; color:#c7cace }
+
+  .note { margin-top:16px; font-size:13px; line-height:1.6; color:#6b7075; max-width:640px }
+  .note a { color:#9aa0a6 }
+  footer { margin-top:70px; padding-top:22px; border-top:1px solid #1d1f21; font-size:12.5px; color:#5b6066; line-height:1.7 }
+  footer a { color:#8a8f94; text-decoration:none }
+  footer a:hover { color:#fff }
+</style></head>
+<body>
+<div class="wrap">
+  <header>
+    <svg width="20" height="20" viewBox="0 0 32 32"><path d="M16 1.5c1.9 7.8 6.8 12.7 14.5 14.5-7.7 1.9-12.6 6.8-14.5 14.5C14.1 22.8 9.2 17.9 1.5 16 9.2 14.2 14.1 9.3 16 1.5z" fill="#fff"/></svg>
+    <span class="lbl">LinkedIn Post Studio · a Builders Studio toolkit</span>
+  </header>
+
+  <div class="hero">
+    <h1>On-brand LinkedIn posts, <em>edited in your browser.</em></h1>
+    <p>A gallery of designed post templates for your brand. Click any post, rewrite the copy,
+       switch the background, and download a crisp PNG, a carousel PDF, or a short video.
+       No design tool, no account, nothing leaves your browser.</p>
+    <a class="cta" href="studio/?v=demo">Open the demo brand <span>→</span></a>
+  </div>
+
+  <div class="sect">Brands</div>
+  <div class="cards">
+    <a class="bcard" href="studio/?v=demo">
+      <span class="swp"><i style="background:#4f6df5"></i><i style="background:#101223"></i><i style="background:#f5f5f7"></i><i style="background:#7b93ff"></i></span>
+      <b>Acme · demo brand</b>
+      <span>13 starter posts and a carousel, built on a fictional product. Play with it, then make it yours.</span>
+    </a>
+    <a class="bcard add" href="#make-it-yours">
+      <b>+ Your brand</b>
+      <span>Your logo, your colors, your posts. Three small steps, no build tools. See below.</span>
+    </a>
+  </div>
+
+  <div class="sect" id="make-it-yours">Make it yours</div>
+  <div class="steps">
+    <div class="step"><span class="n">1</span><b>Copy the demo folder</b>
+      <p>Duplicate <code>brands/demo</code> and rename it, e.g. <code>brands/acmecorp</code>.
+         Drop your logo and photos into its <code>assets/</code> folder.</p></div>
+    <div class="step"><span class="n">2</span><b>Fill in your brand</b>
+      <p>Open <code>studio.mjs</code> in the new folder. It walks you through it:
+         colors, fonts, logo, backgrounds, and your starter posts.</p></div>
+    <div class="step"><span class="n">3</span><b>Register it</b>
+      <p>Add the folder name to <code>brands/registry.mjs</code>, then open
+         <code>studio/?v=acmecorp</code>. Full guide: <code>CUSTOMIZE.md</code>.</p></div>
+  </div>
+  <p class="note">Faster route: open this folder in <a href="https://claude.com/claude-code">Claude Code</a> and say
+     "set this studio up for my brand, here is our website". The included AGENTS.md tells
+     Claude exactly how this tool works.</p>
+
+  <footer>
+    Free and open source (MIT). Runs entirely in your browser; your edits stay on your computer.<br>
+    Built by <a href="https://builders.studio">Builders Studio</a> ·
+    PNG export by html-to-image · PDF export by jsPDF.
+  </footer>
+</div>
+</body></html>

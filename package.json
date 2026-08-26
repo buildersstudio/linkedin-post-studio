@@ -1,0 +1,12 @@
+{
+  "name": "linkedin-post-studio",
+  "version": "1.0.0",
+  "private": false,
+  "description": "On-brand LinkedIn posts in your browser. No build, no server, no account.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.mjs\""
+  }
+}
